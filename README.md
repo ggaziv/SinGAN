@@ -1,8 +1,8 @@
 # SinGAN Apps
----
+
 This is an interface for [SinGAN](http://openaccess.thecvf.com/content_ICCV_2019/papers/Shaham_SinGAN_Learning_a_Generative_Model_From_a_Single_Natural_Image_ICCV_2019_paper.pdf), designed to enable dynamic image augmentations using the original code.
 Specifically it avoids saving or loading any type of data (models or images).
----
+
 ### Usage
 The interface is simple: **Given a tensor image produce a list of *n* augmentations of it:**
 ```
