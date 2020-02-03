@@ -19,3 +19,7 @@ In detail:
 >>> toimage(images_augmented[0])
 ```
 The result is a PIL image.
+
+### Important considerations
+Note that a call to `singan_augment` will take a while (20-60min) as it trains a GAN on your image. 
+Once trained, generating augmentations is very fast. Therefore the number of desired augmentations has a negligible impact on the total run-time.
