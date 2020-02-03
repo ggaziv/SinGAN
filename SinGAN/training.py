@@ -8,34 +8,45 @@ import math
 import matplotlib.pyplot as plt
 from SinGAN.imresize import imresize
 
-def train(opt,Gs,Zs,reals,NoiseAmp):
-    real_ = functions.read_image(opt)
+def train(img_tensor_CHW, opt):
+    # real_ = functions.read_image(opt)
+    real = img_tensor_CHW.unsqueeze(0)
+    if not(opt.not_cuda):
+        real = functions.move_to_gpu(real)
+    # x = x.type(torch.cuda.FloatTensor) if not(opt.not_cuda) else x.type(torch.FloatTensor)
+    #x = x.type(torch.FloatTensor)
+    real = functions.norm(real)
+    functions.adjust_scales2image(real, opt)
     in_s = 0
     scale_num = 0
-    real = imresize(real_,opt.scale1,opt)
-    reals = functions.creat_reals_pyramid(real,reals,opt)
+    real = imresize(real, opt.scale1, opt)
+    reals = functions.creat_reals_pyramid(real, [], opt)
+    
+    Gs = []
+    Zs = []
+    NoiseAmp = []
     nfc_prev = 0
-
     while scale_num<opt.stop_scale+1:
         opt.nfc = min(opt.nfc_init * pow(2, math.floor(scale_num / 4)), 128)
         opt.min_nfc = min(opt.min_nfc_init * pow(2, math.floor(scale_num / 4)), 128)
 
-        opt.out_ = functions.generate_dir2save(opt)
-        opt.outf = '%s/%d' % (opt.out_,scale_num)
-        try:
-            os.makedirs(opt.outf)
-        except OSError:
-                pass
+        # opt.out_ = functions.generate_dir2save(opt)
+        # opt.outf = '%s/%d' % (opt.out_,scale_num)
+        # try:
+        #     os.makedirs(opt.outf)
+        # except OSError:
+        #         pass
 
         #plt.imsave('%s/in.png' %  (opt.out_), functions.convert_image_np(real), vmin=0, vmax=1)
         #plt.imsave('%s/original.png' %  (opt.out_), functions.convert_image_np(real_), vmin=0, vmax=1)
-        plt.imsave('%s/real_scale.png' %  (opt.outf), functions.convert_image_np(reals[scale_num]), vmin=0, vmax=1)
+        # plt.imsave('%s/real_scale.png' %  (opt.outf), functions.convert_image_np(reals[scale_num]), vmin=0, vmax=1)
 
         D_curr,G_curr = init_models(opt)
         if (nfc_prev==opt.nfc):
-            G_curr.load_state_dict(torch.load('%s/%d/netG.pth' % (opt.out_,scale_num-1)))
-            D_curr.load_state_dict(torch.load('%s/%d/netD.pth' % (opt.out_,scale_num-1)))
-
+            # G_curr.load_state_dict(torch.load('%s/%d/netG.pth' % (opt.out_,scale_num-1)))
+            # D_curr.load_state_dict(torch.load('%s/%d/netD.pth' % (opt.out_,scale_num-1)))
+            for x, state_dict in zip([G_curr, D_curr], state_dicts_prev):
+                x.load_state_dict(state_dict)
         z_curr,in_s,G_curr = train_single_scale(D_curr,G_curr,reals,Gs,Zs,in_s,NoiseAmp,opt)
 
         G_curr = functions.reset_grads(G_curr,False)
@@ -47,16 +58,16 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
         Zs.append(z_curr)
         NoiseAmp.append(opt.noise_amp)
 
-        torch.save(Zs, '%s/Zs.pth' % (opt.out_))
-        torch.save(Gs, '%s/Gs.pth' % (opt.out_))
-        torch.save(reals, '%s/reals.pth' % (opt.out_))
-        torch.save(NoiseAmp, '%s/NoiseAmp.pth' % (opt.out_))
+        # torch.save(Zs, '%s/Zs.pth' % (opt.out_))
+        # torch.save(Gs, '%s/Gs.pth' % (opt.out_))
+        # torch.save(reals, '%s/reals.pth' % (opt.out_))
+        # torch.save(NoiseAmp, '%s/NoiseAmp.pth' % (opt.out_))
 
         scale_num+=1
         nfc_prev = opt.nfc
+        state_dicts_prev = [x.state_dict() for x in [G_curr, D_curr]]
         del D_curr,G_curr
-    return
-
+    return Gs, Zs, reals, NoiseAmp
 
 
 def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
@@ -91,7 +102,7 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
     D_real2plot = []
     D_fake2plot = []
     z_opt2plot = []
-
+    
     for epoch in range(opt.niter):
         if (Gs == []) & (opt.mode != 'SR_train'):
             z_opt = functions.generate_noise([1,opt.nzx,opt.nzy], device=opt.device)
@@ -196,12 +207,12 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
         D_fake2plot.append(D_G_z)
         z_opt2plot.append(rec_loss)
 
-        if epoch % 25 == 0 or epoch == (opt.niter-1):
-            print('scale %d:[%d/%d]' % (len(Gs), epoch, opt.niter))
+        # if epoch % 25 == 0 or epoch == (opt.niter-1):
+            # print('scale %d:[%d/%d]' % (len(Gs), epoch, opt.niter))
 
-        if epoch % 500 == 0 or epoch == (opt.niter-1):
-            plt.imsave('%s/fake_sample.png' %  (opt.outf), functions.convert_image_np(fake.detach()), vmin=0, vmax=1)
-            plt.imsave('%s/G(z_opt).png'    % (opt.outf),  functions.convert_image_np(netG(Z_opt.detach(), z_prev).detach()), vmin=0, vmax=1)
+        # if epoch % 500 == 0 or epoch == (opt.niter-1):
+        #     plt.imsave('%s/fake_sample.png' %  (opt.outf), functions.convert_image_np(fake.detach()), vmin=0, vmax=1)
+        #     plt.imsave('%s/G(z_opt).png'    % (opt.outf),  functions.convert_image_np(netG(Z_opt.detach(), z_prev).detach()), vmin=0, vmax=1)
             #plt.imsave('%s/D_fake.png'   % (opt.outf), functions.convert_image_np(D_fake_map))
             #plt.imsave('%s/D_real.png'   % (opt.outf), functions.convert_image_np(D_real_map))
             #plt.imsave('%s/z_opt.png'    % (opt.outf), functions.convert_image_np(z_opt.detach()), vmin=0, vmax=1)
@@ -210,12 +221,12 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
             #plt.imsave('%s/z_prev.png'   % (opt.outf), functions.convert_image_np(z_prev), vmin=0, vmax=1)
 
 
-            torch.save(z_opt, '%s/z_opt.pth' % (opt.outf))
+            # torch.save(z_opt, '%s/z_opt.pth' % (opt.outf))
 
         schedulerD.step()
         schedulerG.step()
 
-    functions.save_networks(netG,netD,z_opt,opt)
+    # functions.save_networks(netG,netD,z_opt,opt)
     return z_opt,in_s,netG    
 
 def draw_concat(Gs,Zs,reals,NoiseAmp,in_s,mode,m_noise,m_image,opt):
@@ -310,13 +321,13 @@ def init_models(opt):
     netG.apply(models.weights_init)
     if opt.netG != '':
         netG.load_state_dict(torch.load(opt.netG))
-    print(netG)
+#     print(netG)
 
     #discriminator initialization:
     netD = models.WDiscriminator(opt).to(opt.device)
     netD.apply(models.weights_init)
     if opt.netD != '':
         netD.load_state_dict(torch.load(opt.netD))
-    print(netD)
+#     print(netD)
 
     return netD, netG
